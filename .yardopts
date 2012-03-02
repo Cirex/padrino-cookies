@@ -1,0 +1,9 @@
+--no-save
+--no-private
+--title Padrino Cookies
+--markup-provider redcarpet
+--markup markdown
+lib/**/*.rb
+-
+README.md
+LICENSE
