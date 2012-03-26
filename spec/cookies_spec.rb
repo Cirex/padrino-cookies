@@ -5,6 +5,20 @@ describe Padrino::Cookies do
     route('foo=bar', 'bar=foo') { cookies }
   end
 
+  context :secret do
+    it 'should use :cookie_secret when set' do
+      app.set :cookie_secret, 'cookie_secret'
+      secret = cookies.instance_variable_get(:@secret)
+      secret.should == 'cookie_secret'
+    end
+
+    it 'should fall back to :session_secret when :cookie_secret is not set' do
+      app.set :session_secret, 'session_secret'
+      secret = cookies.instance_variable_get(:@secret)
+      secret.should == 'session_secret'
+    end
+  end
+
   context :[] do
     it 'can retrieve existing cookies' do
       cookies['foo'].should == 'bar'
@@ -30,6 +44,18 @@ describe Padrino::Cookies do
     it 'should allow symbols to be used as keys' do
       cookies[:test] = 'test'
       cookies[:test].should == 'test'
+      cookies['test'].should == 'test'
+    end
+
+    it 'should raise Overflow when more then 4096 bytes are used' do
+      cookies['test'] = 'C' * 4096
+      cookies['test'].should_not be_nil
+
+      expect { cookies['test'] = 'C' * 4097 }.to raise_error(Padrino::Cookies::Overflow)
+    end
+
+    it 'should accept a hash of options' do
+      cookies['test'] = { value: 'test', path: '/' }
       cookies['test'].should == 'test'
     end
 
@@ -86,7 +112,7 @@ describe Padrino::Cookies do
     end
   end
 
-  describe :clear do
+  context :clear do
     it 'can delete all cookies that are set' do
       cookies['foo'].should == 'bar'
       cookies['bar'].should == 'foo'
@@ -110,7 +136,7 @@ describe Padrino::Cookies do
     end
   end
 
-  describe :keys do
+  context :keys do
     it 'can give you a list of cookies that are set' do
       cookies.keys.should == ['bar', 'foo']
     end
@@ -161,9 +187,16 @@ describe Padrino::Cookies do
   end
 
   context :permanent do
+    before { app.set :cookie_secret, ('test' * 16) }
+
     it 'should add cookies to the parent jar' do
       cookies.permanent['baz'] = 'foo'
       cookies['baz'].should == 'foo'
+    end
+
+    it 'should accept a hash of options' do
+      cookies.permanent['foo'] = { value: 'baz', path: '/' }
+      cookies['foo'].should == 'baz'
     end
 
     it 'should set a cookie that expires in the distant future' do
@@ -173,6 +206,50 @@ describe Padrino::Cookies do
       end
 
       result.should =~ /#{1.year.from_now.year}/
+    end
+
+    it 'should allow you to chain signed cookies' do
+      result = route do
+        cookies.permanent.signed['foo'] = 'baz'
+        response['Set-Cookie']
+      end
+
+      result.should =~ /#{1.year.from_now.year}/
+      result.should =~ /6cbc7824dbfd7121efb019bb55f01be1e07bcf58/
+    end
+  end
+
+  context :signed do
+    before { app.set :cookie_secret, ('test' * 16) }
+
+    it 'should read signed values' do
+      cookies['foo'] = 'BAhJIghiYXoGOgZFRg==--6cbc7824dbfd7121efb019bb55f01be1e07bcf58'
+      cookies.signed['foo'].should == 'baz'
+    end
+
+    it 'should write signed values' do
+      cookies.signed['foo'] = 'baz'
+      cookies['foo'].should == 'BAhJIghiYXoGOgZFRg==--6cbc7824dbfd7121efb019bb55f01be1e07bcf58'
+    end
+
+    it 'should accept a hash of options' do
+      cookies.signed['foo'] = { value: 'baz', path: '/' }
+      cookies.signed['foo'].should == 'baz'
+    end
+
+    it 'should require a 64 character secret' do
+      app.set :cookie_secret, ('C' * 63)
+      expect { cookies.signed['foo'] = 'baz' }.to raise_error(ArgumentError)
+    end
+
+    it 'should allow you to chain permanent cookies' do
+      result = route do
+        cookies.signed.permanent['foo'] = 'baz'
+        response['Set-Cookie']
+      end
+
+      result.should =~ /#{1.year.from_now.year}/
+      result.should =~ /6cbc7824dbfd7121efb019bb55f01be1e07bcf58/
     end
   end
 end

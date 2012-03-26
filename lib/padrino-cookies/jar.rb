@@ -1,9 +1,4 @@
 # encoding: UTF-8
-require 'active_support/core_ext/integer/time'
-require 'active_support/core_ext/numeric/time'
-require 'active_support/core_ext/numeric/bytes'
-require 'active_support/core_ext/date/calculations'
-
 module Padrino
   module Cookies
     class Jar
@@ -14,6 +9,12 @@ module Padrino
         @response = app.response
         @request  = app.request
         @cookies  = app.request.cookies
+
+        if app.settings.respond_to?(:cookie_secret)
+          @secret = app.settings.cookie_secret
+        elsif app.settings.respond_to?(:session_secret)
+          @secret = app.settings.session_secret
+        end
 
         @options = {
               path: '/',
@@ -29,7 +30,7 @@ module Padrino
       #   Value of the cookie
       #
       # @example
-      #   cookies[:remembrance]
+      #   cookie[:remembrance]
       #   # => '71ab53190d2f863b5f3b12381d2d5986512f8e15b34d439e6b66e3daf41b5e35'
       #
       # @since 0.1.0
@@ -66,8 +67,11 @@ module Padrino
       #   @option options [String] :domain
       #     The scope in which this cookie is accessible
       #
+      # @raise [Overflow]
+      #   Raised when the value of the cookie exceeds the maximum size
+      #
       # @example
-      #   cookies[:remembrance] = '71ab53190d2f863b5f3b12381d2d5986512f8e15b34d439e6b66e3daf41b5e35'
+      #   cookie[:remembrance] = '71ab53190d2f863b5f3b12381d2d5986512f8e15b34d439e6b66e3daf41b5e35'
       #
       # @since 0.1.0
       # @api public
@@ -75,6 +79,8 @@ module Padrino
         unless options.is_a?(Hash)
           options = { value: options }
         end
+
+        raise Overflow if options[:value].size > MAX_COOKIE_SIZE
 
         @response.set_cookie(name, @options.merge(options))
         @cookies[name.to_s] = options[:value]
@@ -205,32 +211,79 @@ module Padrino
       # Sets a permanent cookie
       #
       # @example
-      #   cookies.permanent[:remembrance] = '71ab53190d2f863b5f3b12381d2d5986512f8e15b34d439e6b66e3daf41b5e35'
+      #   cookie.permanent[:remembrance] = '71ab53190d2f863b5f3b12381d2d5986512f8e15b34d439e6b66e3daf41b5e35'
       #
       # @since 0.1.0
       # @api public
       def permanent
-        @permanent ||= PermanentJar.new(self)
+        @permanent ||= PermanentJar.new(self, @secret)
+      end
+
+      ###
+      # Signs a cookie with a cryptographic hash so it cannot be tampered with
+      #
+      # @example
+      #   cookie.signed[:remembrance] = '71ab53190d2f863b5f3b12381d2d5986512f8e15b34d439e6b66e3daf41b5e35'
+      #
+      # @since 0.1.1
+      # @api public
+      def signed
+        @signed ||= SignedJar.new(self, @secret)
       end
     end # Jar
 
     class PermanentJar # @private
-      def initialize(parent_jar)
+      def initialize(parent_jar, secret)
         @parent_jar = parent_jar
+        @secret = secret
       end
 
-      def []=(key, options)
-        unless options.is_a?(Hash)
-          options = { value: options }
-        end
-
+      def []=(name, options)
+        options = { value: options } unless options.is_a?(Hash)
         options[:expires] = 1.year.from_now
-        @parent_jar[key] = options
+        @parent_jar[name] = options
+      end
+
+      def signed
+        @signed ||= SignedJar.new(self, @secret)
       end
 
       def method_missing(method, *args, &block)
         @parent_jar.send(method, *args, &block)
       end
     end # PermanentJar
+
+    class SignedJar # @private
+      def initialize(parent_jar, secret)
+        if secret.blank? || secret.size < 64
+          raise ArgumentError, 'cookie_secret must be at least 64 characters long'
+        end
+
+        @parent_jar = parent_jar
+        @message_verifier = ActiveSupport::MessageVerifier.new(secret)
+      end
+
+      def [](name)
+        if value = @parent_jar[name]
+          @message_verifier.verify(value)
+        end
+      rescue
+        nil
+      end
+
+      def []=(name, options)
+        options = { value: options } unless options.is_a?(Hash)
+        options[:value] = @message_verifier.generate(options[:value])
+        @parent_jar[name] = options
+      end
+
+      def permanent
+        @permanent ||= PermanentJar.new(self, @secret)
+      end
+
+      def method_missing(method, *args, &block)
+        @parent_jar.send(method, *args, &block)
+      end
+    end # SignedJar
   end # Cookies
 end # Padrino

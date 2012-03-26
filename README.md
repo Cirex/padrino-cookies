@@ -30,7 +30,6 @@ TODO
 -----
 
 * Additional documentation
-* Signed cookies
 
 Copyright
 ---------
