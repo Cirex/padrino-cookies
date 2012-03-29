@@ -1,4 +1,4 @@
-require_relative 'spec'
+require 'spec_helper'
 
 describe Padrino::Cookies do
   let :cookies do
@@ -55,7 +55,7 @@ describe Padrino::Cookies do
     end
 
     it 'should accept a hash of options' do
-      cookies['test'] = { value: 'test', path: '/' }
+      cookies['test'] = { :value => 'test', :path => '/' }
       cookies['test'].should == 'test'
     end
 
@@ -188,6 +188,9 @@ describe Padrino::Cookies do
 
   context :permanent do
     before { app.set :cookie_secret, ('test' * 16) }
+    let :verifier do
+      ActiveSupport::MessageVerifier.new('test' * 16)
+    end
 
     it 'should add cookies to the parent jar' do
       cookies.permanent['baz'] = 'foo'
@@ -195,7 +198,7 @@ describe Padrino::Cookies do
     end
 
     it 'should accept a hash of options' do
-      cookies.permanent['foo'] = { value: 'baz', path: '/' }
+      cookies.permanent['foo'] = { :value => 'baz', :path => '/' }
       cookies['foo'].should == 'baz'
     end
 
@@ -215,25 +218,28 @@ describe Padrino::Cookies do
       end
 
       result.should =~ /#{1.year.from_now.year}/
-      result.should =~ /6cbc7824dbfd7121efb019bb55f01be1e07bcf58/
+      result.should =~ Regexp.new(verifier.generate('baz').gsub('=', '%3D'))
     end
   end
 
   context :signed do
     before { app.set :cookie_secret, ('test' * 16) }
+    let :verifier do
+      ActiveSupport::MessageVerifier.new('test' * 16)
+    end
 
     it 'should read signed values' do
-      cookies['foo'] = 'BAhJIghiYXoGOgZFRg==--6cbc7824dbfd7121efb019bb55f01be1e07bcf58'
+      cookies['foo'] = verifier.generate('baz')
       cookies.signed['foo'].should == 'baz'
     end
 
     it 'should write signed values' do
       cookies.signed['foo'] = 'baz'
-      cookies['foo'].should == 'BAhJIghiYXoGOgZFRg==--6cbc7824dbfd7121efb019bb55f01be1e07bcf58'
+      cookies['foo'].should == verifier.generate('baz')
     end
 
     it 'should accept a hash of options' do
-      cookies.signed['foo'] = { value: 'baz', path: '/' }
+      cookies.signed['foo'] = { :value => 'baz', :path => '/' }
       cookies.signed['foo'].should == 'baz'
     end
 
@@ -249,7 +255,7 @@ describe Padrino::Cookies do
       end
 
       result.should =~ /#{1.year.from_now.year}/
-      result.should =~ /6cbc7824dbfd7121efb019bb55f01be1e07bcf58/
+      result.should =~ Regexp.new(verifier.generate('baz').gsub('=', '%3D'))
     end
   end
 end
