@@ -24,7 +24,7 @@ Dependencies
 ------------
 
 * [Padrino-Core](https://github.com/padrino/padrino-framework)
-* [Ruby](http://www.ruby-lang.org/en) >= 1.9.2
+* [Ruby](http://www.ruby-lang.org/en) >= 1.8.7
 
 TODO
 -----
