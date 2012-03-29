@@ -1,4 +1,4 @@
-require 'spec'
+require 'spec_helper'
 
 describe Padrino::Cookies do
   let :cookies do
