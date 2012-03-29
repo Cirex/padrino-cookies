@@ -55,7 +55,7 @@ describe Padrino::Cookies do
     end
 
     it 'should accept a hash of options' do
-      cookies['test'] = { value: 'test', path: '/' }
+      cookies['test'] = { :value => 'test', :path => '/' }
       cookies['test'].should == 'test'
     end
 
@@ -195,7 +195,7 @@ describe Padrino::Cookies do
     end
 
     it 'should accept a hash of options' do
-      cookies.permanent['foo'] = { value: 'baz', path: '/' }
+      cookies.permanent['foo'] = { :value => 'baz', :path => '/' }
       cookies['foo'].should == 'baz'
     end
 
@@ -233,7 +233,7 @@ describe Padrino::Cookies do
     end
 
     it 'should accept a hash of options' do
-      cookies.signed['foo'] = { value: 'baz', path: '/' }
+      cookies.signed['foo'] = { :value => 'baz', :path => '/' }
       cookies.signed['foo'].should == 'baz'
     end
 
