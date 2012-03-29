@@ -17,9 +17,9 @@ module Padrino
         end
 
         @options = {
-              path: '/',
-          httponly: true,
-            secure: @request.secure?
+          :path     => '/',
+          :httponly => true,
+          :secure   => @request.secure?
         }
       end
 
@@ -77,7 +77,7 @@ module Padrino
       # @api public
       def []=(name, options)
         unless options.is_a?(Hash)
-          options = { value: options }
+          options = { :value => options }
         end
 
         raise Overflow if options[:value].size > MAX_COOKIE_SIZE
@@ -239,7 +239,7 @@ module Padrino
       end
 
       def []=(name, options)
-        options = { value: options } unless options.is_a?(Hash)
+        options = { :value => options } unless options.is_a?(Hash)
         options[:expires] = 1.year.from_now
         @parent_jar[name] = options
       end
@@ -272,7 +272,7 @@ module Padrino
       end
 
       def []=(name, options)
-        options = { value: options } unless options.is_a?(Hash)
+        options = { :value => options } unless options.is_a?(Hash)
         options[:value] = @message_verifier.generate(options[:value])
         @parent_jar[name] = options
       end
